@@ -1,0 +1,26 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Chat with the database",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/chat.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Run experiments (all strategies)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/run_experiments.py",
+      "console": "integratedTerminal"
+    },
+    {
+      "name": "Rebuild database",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/db.py",
+      "console": "integratedTerminal"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+# never commit the OpenAI key
+config.json
+
+.venv/
+__pycache__/
