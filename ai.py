@@ -2,7 +2,7 @@
 import json
 import os
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
 import db
 from prompt_examples import (
@@ -19,17 +19,23 @@ _model = DEFAULT_MODEL
 
 
 def get_client():
-    """Create the OpenAI client from config.json the first time it is needed."""
+    """Create the client from config.json the first time it is needed.
+
+    Works with OpenAI, or with any provider that offers an OpenAI-compatible
+    endpoint (such as Gemini) when "baseUrl" is set in config.json.
+    """
     global _client, _model
     if _client is None:
         if not os.path.exists(CONFIG_PATH):
-            raise SystemExit("config.json not found. Copy config.example.json to config.json and paste in your OpenAI key.")
-        with open(CONFIG_PATH) as f:
+            raise SystemExit("config.json not found. Copy config.example.json to config.json and paste in your API key.")
+        with open(CONFIG_PATH, encoding="utf-8-sig") as f:  # -sig: tolerate a BOM from Windows editors
             config = json.load(f)
-        if not config.get("openaiKey", "").startswith("sk-"):
-            raise SystemExit("config.json does not contain an OpenAI key yet. Paste yours into the \"openaiKey\" field.")
+        api_key = config.get("apiKey") or config.get("openaiKey", "")
+        if not api_key or "PASTE" in api_key:
+            raise SystemExit("config.json does not contain an API key yet. Paste yours into the \"apiKey\" field.")
         _model = config.get("model", DEFAULT_MODEL)
-        _client = OpenAI(api_key=config["openaiKey"])
+        # max_retries waits and retries when a free tier's per-minute limit is hit
+        _client = OpenAI(api_key=api_key, base_url=config.get("baseUrl"), max_retries=4)
     return _client
 
 
@@ -38,11 +44,20 @@ def get_model():
     return _model
 
 
+class QuotaExhausted(Exception):
+    """The daily quota is used up, so retrying today won't help."""
+
+
 def ask_gpt(content):
-    response = get_client().chat.completions.create(
-        model=_model,
-        messages=[{"role": "user", "content": content}],
-    )
+    try:
+        response = get_client().chat.completions.create(
+            model=_model,
+            messages=[{"role": "user", "content": content}],
+        )
+    except RateLimitError as err:
+        if "perday" in str(err).lower().replace(" ", ""):
+            raise QuotaExhausted(f"Daily request limit reached for {_model}.") from err
+        raise
     return response.choices[0].message.content
 
 
@@ -149,6 +164,16 @@ def answer_question(question, strategy="zero_shot"):
         columns, rows = db.run_sql(result["sql"])
         result["queryRawResponse"] = str(rows)
         result["friendlyResponse"] = get_friendly_answer(question, result["sql"], columns, rows)
+    except QuotaExhausted:
+        raise  # stop the whole run instead of failing every remaining question
     except Exception as err:
         result["error"] = str(err)
     return result
+
+
+if __name__ == "__main__":
+    # Key check: lists the models this key can use, then asks one tiny question.
+    print("Models available to this key:")
+    for model in get_client().models.list():
+        print("  " + model.id)
+    print(f"\nUsing model {get_model()}: " + ask_gpt("Reply with just the word: working"))

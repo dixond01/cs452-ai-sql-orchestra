@@ -1,0 +1,84 @@
+{
+  "strategy": "zero_shot",
+  "model": "gemini-3.8-flash",
+  "prompt_prefix": "create table conductor (\n    conductor_id integer primary key,\n    name varchar(40) not null,\n    email varchar(60)\n);\n\ncreate table ensemble (\n    ensemble_id integer primary key,\n    name varchar(40) not null,\n    conductor_id integer not null,\n    rehearsal_day varchar(9) not null,\n    start_time char(5) not null,\n    end_time char(5) not null,\n    room varchar(30),\n    foreign key (conductor_id) references conductor (conductor_id)\n);\n\ncreate table player (\n    player_id integer primary key,\n    first_name varchar(20) not null,\n    last_name varchar(20) not null,\n    birth_date date not null,\n    school_grade integer\n);\n\ncreate table parent (\n    parent_id integer primary key,\n    name varchar(40) not null,\n    phone varchar(12),\n    email varchar(60)\n);\n\ncreate table player_parent (\n    player_id integer not null,\n    parent_id integer not null,\n    primary key (player_id, parent_id),\n    foreign key (player_id) references player (player_id),\n    foreign key (parent_id) references parent (parent_id)\n);\n\ncreate table section (\n    section_id integer primary key,\n    name varchar(20) not null,\n    instrument varchar(20) not null,\n    family varchar(10) not null\n);\n\ncreate table membership (\n    ensemble_id integer not null,\n    player_id integer not null,\n    section_id integer not null,\n    chair_number integer not null,\n    primary key (ensemble_id, player_id),\n    unique (ensemble_id, section_id, chair_number),\n    foreign key (ensemble_id) references ensemble (ensemble_id),\n    foreign key (player_id) references player (player_id),\n    foreign key (section_id) references section (section_id)\n);\n\n/* 3 example rows from conductor:\nconductor_id | name | email\n1 | Maria Alvarez | malvarez@valleyyouthmusic.org\n2 | David Chen | dchen@valleyyouthmusic.org\n3 | Susan Whitaker | swhitaker@valleyyouthmusic.org */\n\n/* 3 example rows from ensemble:\nensemble_id | name | conductor_id | rehearsal_day | start_time | end_time | room\n1 | Symphony Orchestra | 1 | Saturday | 09:00 | 11:30 | Concert Hall\n2 | Wind Ensemble | 2 | Saturday | 10:00 | 12:00 | Band Room\n3 | String Quartet | 3 | Tuesday | 16:00 | 17:00 | Room 102 */\n\n/* 3 example rows from player:\nplayer_id | first_name | last_name | birth_date | school_grade\n1 | Emma | Larsen | 2010-03-14 | 10\n2 | Noah | Larsen | 2012-07-02 | 8\n3 | Olivia | Kim | 2009-11-23 | 11 */\n\n/* 3 example rows from parent:\nparent_id | name | phone | email\n1 | Karen Larsen | 801-555-0101 | karen.larsen@example.com\n2 | Erik Larsen | 801-555-0102 | erik.larsen@example.com\n3 | Min-jung Kim | 801-555-0103 | mjkim@example.com */\n\n/* 3 example rows from player_parent:\nplayer_id | parent_id\n1 | 1\n1 | 2\n2 | 1 */\n\n/* 3 example rows from section:\nsection_id | name | instrument | family\n1 | Violin I | Violin | strings\n2 | Violin II | Violin | strings\n3 | Viola | Viola | strings */\n\n/* 3 example rows from membership:\nensemble_id | player_id | section_id | chair_number\n1 | 3 | 1 | 1\n1 | 1 | 1 | 2\n1 | 9 | 1 | 3 */\n\nGive me a sqlite select statement that answers the question. Only respond with sqlite syntax. If there is an error do not explain it!",
+  "questionResults": [
+    {
+      "question": "How many players are in each ensemble?",
+      "sql": "SELECT ensemble.name, count(membership.player_id) FROM ensemble LEFT JOIN membership ON ensemble.ensemble_id = membership.ensemble_id GROUP BY ensemble.ensemble_id, ensemble.name;",
+      "queryRawResponse": "[('Symphony Orchestra', 10), ('Wind Ensemble', 5), ('String Quartet', 4), ('Jazz Band', 7), ('Chamber Strings', 6)]",
+      "friendlyResponse": "Here is the number of players in each ensemble:\n\n* **Symphony Orchestra:** 10\n* **Wind Ensemble:** 5\n* **String Quartet:** 4\n* **Jazz Band:** 7\n* **Chamber Strings:** 6",
+      "error": "None"
+    },
+    {
+      "question": "Who is the first chair cellist in the Symphony Orchestra?",
+      "sql": "SELECT player.first_name, player.last_name\nFROM player\nJOIN membership ON player.player_id = membership.player_id\nJOIN ensemble ON membership.ensemble_id = ensemble.ensemble_id\nJOIN section ON membership.section_id = section.section_id\nWHERE ensemble.name = 'Symphony Orchestra'\n  AND membership.chair_number = 1\n  AND (section.instrument = 'Cello' OR section.name = 'Cello');",
+      "queryRawResponse": "[('Ethan', 'Nguyen')]",
+      "friendlyResponse": "The first chair cellist in the Symphony Orchestra is Ethan Nguyen.",
+      "error": "None"
+    },
+    {
+      "question": "Which players play more than one instrument?",
+      "sql": "select\n  p.player_id,\n  p.first_name,\n  p.last_name\nfrom player p\njoin membership m on p.player_id = m.player_id\njoin section s on m.section_id = s.section_id\ngroup by p.player_id, p.first_name, p.last_name\nhaving count(distinct s.instrument) > 1;",
+      "queryRawResponse": "[(1, 'Emma', 'Larsen'), (7, 'Sophia', 'Martinez'), (8, 'Mason', 'Clark'), (13, 'Charlotte', 'Davis'), (15, 'Amelia', 'Garcia')]",
+      "friendlyResponse": "The following players play more than one instrument:\n\n* Emma Larsen (ID: 1)\n* Sophia Martinez (ID: 7)\n* Mason Clark (ID: 8)\n* Charlotte Davis (ID: 13)\n* Amelia Garcia (ID: 15)",
+      "error": "None"
+    },
+    {
+      "question": "Which parents have more than one child in the program?",
+      "sql": "SELECT\n  t1.name\nFROM parent AS t1\nJOIN player_parent AS t2\n  ON t1.parent_id = t2.parent_id\nGROUP BY\n  t1.parent_id,\n  t1.name\nHAVING\n  COUNT(t2.player_id) > 1;",
+      "queryRawResponse": "[('Karen Larsen',), ('Erik Larsen',), ('Laura Davis',)]",
+      "friendlyResponse": "The parents who have more than one child in the program are Karen Larsen, Erik Larsen, and Laura Davis.",
+      "error": "None"
+    },
+    {
+      "question": "Which players are not in any ensemble?",
+      "sql": "SELECT first_name, last_name FROM player WHERE player_id NOT IN (SELECT player_id FROM membership);",
+      "queryRawResponse": "[('Jack', 'Olsen')]",
+      "friendlyResponse": "Jack Olsen is the only player not currently in any ensemble.",
+      "error": "None"
+    },
+    {
+      "question": "Who is the youngest player in the Wind Ensemble?",
+      "sql": "SELECT\n  t1.first_name,\n  t1.last_name\nFROM player AS t1\nJOIN membership AS t2\n  ON t1.player_id = t2.player_id\nJOIN ensemble AS t3\n  ON t2.ensemble_id = t3.ensemble_id\nWHERE t3.name = 'Wind Ensemble'\nORDER BY t1.birth_date DESC\nLIMIT 1;",
+      "queryRawResponse": "[('Henry', 'Wilson')]",
+      "friendlyResponse": "The youngest player in the Wind Ensemble is Henry Wilson.",
+      "error": "None"
+    },
+    {
+      "question": "Which conductor works with the most players?",
+      "sql": "SELECT c.name\nFROM conductor c\nJOIN ensemble e ON c.conductor_id = e.conductor_id\nJOIN membership m ON e.ensemble_id = m.ensemble_id\nGROUP BY c.conductor_id, c.name\nORDER BY COUNT(DISTINCT m.player_id) DESC\nLIMIT 1;",
+      "queryRawResponse": "[('Maria Alvarez',)]",
+      "friendlyResponse": "Maria Alvarez works with the most players.",
+      "error": "None"
+    },
+    {
+      "question": "Which ensembles have rehearsals that overlap in time?",
+      "sql": "SELECT DISTINCT t1.name\nFROM ensemble AS t1\nJOIN ensemble AS t2\n  ON t1.ensemble_id != t2.ensemble_id\n AND t1.rehearsal_day = t2.rehearsal_day\nWHERE t1.start_time < t2.end_time\n  AND t1.end_time > t2.start_time;",
+      "queryRawResponse": "[('Symphony Orchestra',), ('Wind Ensemble',), ('String Quartet',), ('Chamber Strings',)]",
+      "friendlyResponse": "The ensembles with rehearsals that overlap in time are:\n\n* Symphony Orchestra\n* Wind Ensemble\n* String Quartet\n* Chamber Strings",
+      "error": "None"
+    },
+    {
+      "question": "Which other ensembles could Emma Larsen join without a schedule conflict?",
+      "sql": "SELECT e.name\nFROM ensemble e\nWHERE e.ensemble_id NOT IN (\n    SELECT m.ensemble_id\n    FROM membership m\n    JOIN player p ON m.player_id = p.player_id\n    WHERE p.first_name = 'Emma' AND p.last_name = 'Larsen'\n)\nAND NOT EXISTS (\n    SELECT 1\n    FROM membership m\n    JOIN player p ON m.player_id = p.player_id\n    JOIN ensemble cur ON m.ensemble_id = cur.ensemble_id\n    WHERE p.first_name = 'Emma' AND p.last_name = 'Larsen'\n      AND cur.rehearsal_day = e.rehearsal_day\n      AND cur.start_time < e.end_time\n      AND e.start_time < cur.end_time\n);",
+      "queryRawResponse": "[]",
+      "friendlyResponse": "",
+      "error": "Error code: 503 - [{'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}]"
+    },
+    {
+      "question": "We need to email the parents of everyone in the Jazz Band. Is there anyone we can't reach?",
+      "sql": "",
+      "queryRawResponse": "",
+      "friendlyResponse": "",
+      "error": "Error code: 429 - [{'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash\\nPlease retry in 21h17m26.860150892s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'model': 'gemini-3.8-flash', 'location': 'global'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '76646s'}]}}]"
+    },
+    {
+      "question": "Do any orchestras have the same conductor? Which ones?",
+      "sql": "",
+      "queryRawResponse": "",
+      "friendlyResponse": "",
+      "error": "Error code: 429 - [{'error': {'code': 429, 'message': 'You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/rate-limit. \\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash\\nPlease retry in 21h17m5.540095658s.', 'status': 'RESOURCE_EXHAUSTED', 'details': [{'@type': 'type.googleapis.com/google.rpc.Help', 'links': [{'description': 'Learn more about Gemini API quotas', 'url': 'https://ai.google.dev/gemini-api/docs/rate-limits'}]}, {'@type': 'type.googleapis.com/google.rpc.QuotaFailure', 'violations': [{'quotaMetric': 'generativelanguage.googleapis.com/generate_content_free_tier_requests', 'quotaId': 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', 'quotaDimensions': {'location': 'global', 'model': 'gemini-3.8-flash'}, 'quotaValue': '20'}]}, {'@type': 'type.googleapis.com/google.rpc.RetryInfo', 'retryDelay': '76625s'}]}}]"
+    }
+  ]
+}

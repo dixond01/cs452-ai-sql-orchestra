@@ -1,0 +1,84 @@
+{
+  "strategy": "cross_domain",
+  "model": "openai/gpt-oss-120b",
+  "prompt_prefix": "Here is an example database:\n\ncreate table person (\n    person_id integer primary key,\n    name varchar(20) not null\n);\n\ncreate table phone (\n    phone_id integer primary key,\n    person_id integer not null,\n    area_code int not null,\n    number int not null,\n    can_recieve_sms tinyint not null,\n    foreign key (person_id) references person (person_id)\n);\n\ncreate table dog (\n    dog_id integer primary key,\n    name varchar(35),\n    breed varchar(35),\n    birth_date date\n);\n\ncreate table award (\n    award_id integer primary key,\n    dog_id integer not null,\n    event_date date,\n    award_name varchar(25) not null,\n    foreign key (dog_id) references dog (dog_id)\n);\n\ncreate table person_dog (\n    dog_id integer,\n    person_id integer,\n    foreign key (dog_id) references dog (dog_id),\n    foreign key (person_id) references person (person_id)\n);\n\nHere are example questions about that database and the sqlite that answers them:\n\nQuestion: Which are the most awarded dogs?\nSELECT d.name, COUNT(a.award_id) AS award_count\nFROM dog d\nJOIN award a ON d.dog_id = a.dog_id\nGROUP BY d.dog_id\nORDER BY award_count DESC;\n\nQuestion: Which dogs have multiple owners?\nSELECT d.dog_id, d.name\nFROM dog d\nJOIN person_dog pd ON d.dog_id = pd.dog_id\nGROUP BY d.dog_id\nHAVING COUNT(pd.person_id) > 1;\n\nQuestion: Who doesn't have a way for us to text them?\nSELECT p.person_id, p.name\nFROM person p\nLEFT JOIN phone ph ON p.person_id = ph.person_id AND ph.can_recieve_sms = 1\nWHERE ph.phone_id IS NULL;\n\nNow here is a different database. Answer the question about this one:\n\ncreate table conductor (\n    conductor_id integer primary key,\n    name varchar(40) not null,\n    email varchar(60)\n);\n\ncreate table ensemble (\n    ensemble_id integer primary key,\n    name varchar(40) not null,\n    conductor_id integer not null,\n    rehearsal_day varchar(9) not null,\n    start_time char(5) not null,\n    end_time char(5) not null,\n    room varchar(30),\n    foreign key (conductor_id) references conductor (conductor_id)\n);\n\ncreate table player (\n    player_id integer primary key,\n    first_name varchar(20) not null,\n    last_name varchar(20) not null,\n    birth_date date not null,\n    school_grade integer\n);\n\ncreate table parent (\n    parent_id integer primary key,\n    name varchar(40) not null,\n    phone varchar(12),\n    email varchar(60)\n);\n\ncreate table player_parent (\n    player_id integer not null,\n    parent_id integer not null,\n    primary key (player_id, parent_id),\n    foreign key (player_id) references player (player_id),\n    foreign key (parent_id) references parent (parent_id)\n);\n\ncreate table section (\n    section_id integer primary key,\n    name varchar(20) not null,\n    instrument varchar(20) not null,\n    family varchar(10) not null\n);\n\ncreate table membership (\n    ensemble_id integer not null,\n    player_id integer not null,\n    section_id integer not null,\n    chair_number integer not null,\n    primary key (ensemble_id, player_id),\n    unique (ensemble_id, section_id, chair_number),\n    foreign key (ensemble_id) references ensemble (ensemble_id),\n    foreign key (player_id) references player (player_id),\n    foreign key (section_id) references section (section_id)\n);\n\n/* 3 example rows from conductor:\nconductor_id | name | email\n1 | Maria Alvarez | malvarez@valleyyouthmusic.org\n2 | David Chen | dchen@valleyyouthmusic.org\n3 | Susan Whitaker | swhitaker@valleyyouthmusic.org */\n\n/* 3 example rows from ensemble:\nensemble_id | name | conductor_id | rehearsal_day | start_time | end_time | room\n1 | Symphony Orchestra | 1 | Saturday | 09:00 | 11:30 | Concert Hall\n2 | Wind Ensemble | 2 | Saturday | 10:00 | 12:00 | Band Room\n3 | String Quartet | 3 | Tuesday | 16:00 | 17:00 | Room 102 */\n\n/* 3 example rows from player:\nplayer_id | first_name | last_name | birth_date | school_grade\n1 | Emma | Larsen | 2010-03-14 | 10\n2 | Noah | Larsen | 2012-07-02 | 8\n3 | Olivia | Kim | 2009-11-23 | 11 */\n\n/* 3 example rows from parent:\nparent_id | name | phone | email\n1 | Karen Larsen | 801-555-0101 | karen.larsen@example.com\n2 | Erik Larsen | 801-555-0102 | erik.larsen@example.com\n3 | Min-jung Kim | 801-555-0103 | mjkim@example.com */\n\n/* 3 example rows from player_parent:\nplayer_id | parent_id\n1 | 1\n1 | 2\n2 | 1 */\n\n/* 3 example rows from section:\nsection_id | name | instrument | family\n1 | Violin I | Violin | strings\n2 | Violin II | Violin | strings\n3 | Viola | Viola | strings */\n\n/* 3 example rows from membership:\nensemble_id | player_id | section_id | chair_number\n1 | 3 | 1 | 1\n1 | 1 | 1 | 2\n1 | 9 | 1 | 3 */\n\nGive me a sqlite select statement that answers the question. Only respond with sqlite syntax. If there is an error do not explain it!",
+  "questionResults": [
+    {
+      "question": "How many players are in each ensemble?",
+      "sql": "SELECT e.name AS ensemble_name,\n       COUNT(m.player_id) AS player_count\nFROM ensemble e\nLEFT JOIN membership m ON e.ensemble_id = m.ensemble_id\nGROUP BY e.ensemble_id\nORDER BY e.name;",
+      "queryRawResponse": "[('Chamber Strings', 6), ('Jazz Band', 7), ('String Quartet', 4), ('Symphony Orchestra', 10), ('Wind Ensemble', 5)]",
+      "friendlyResponse": "Here\u2019s how many players are in each ensemble:\n\n- Chamber Strings: 6 players  \n- Jazz Band: 7 players  \n- String Quartet: 4 players  \n- Symphony Orchestra: 10 players  \n- Wind Ensemble: 5 players",
+      "error": "None"
+    },
+    {
+      "question": "Who is the first chair cellist in the Symphony Orchestra?",
+      "sql": "SELECT p.first_name, p.last_name\nFROM membership m\nJOIN ensemble e ON m.ensemble_id = e.ensemble_id\nJOIN player p ON m.player_id = p.player_id\nJOIN section s ON m.section_id = s.section_id\nWHERE e.name = 'Symphony Orchestra'\n  AND m.chair_number = 1\n  AND s.instrument = 'Cello';",
+      "queryRawResponse": "[('Ethan', 'Nguyen')]",
+      "friendlyResponse": "The first\u2011chair cellist is **Ethan Nguyen**.",
+      "error": "None"
+    },
+    {
+      "question": "Which players play more than one instrument?",
+      "sql": "SELECT p.player_id, p.first_name, p.last_name\nFROM player p\nJOIN membership m ON p.player_id = m.player_id\nJOIN section s ON m.section_id = s.section_id\nGROUP BY p.player_id\nHAVING COUNT(DISTINCT s.instrument) > 1;",
+      "queryRawResponse": "[(1, 'Emma', 'Larsen'), (7, 'Sophia', 'Martinez'), (8, 'Mason', 'Clark'), (13, 'Charlotte', 'Davis'), (15, 'Amelia', 'Garcia')]",
+      "friendlyResponse": "Here are the players who play more than one instrument:\n\n- Emma Larsen (ID\u202f1)  \n- Sophia Martinez (ID\u202f7)  \n- Mason Clark (ID\u202f8)  \n- Charlotte Davis (ID\u202f13)  \n- Amelia Garcia (ID\u202f15)",
+      "error": "None"
+    },
+    {
+      "question": "Which parents have more than one child in the program?",
+      "sql": "SELECT p.parent_id, p.name\nFROM parent p\nJOIN player_parent pp ON p.parent_id = pp.parent_id\nGROUP BY p.parent_id, p.name\nHAVING COUNT(pp.player_id) > 1;",
+      "queryRawResponse": "[(1, 'Karen Larsen'), (2, 'Erik Larsen'), (12, 'Laura Davis')]",
+      "friendlyResponse": "The parents with more than one child in the program are:\n\n- Karen Larsen (parent_id\u202f1)  \n- Erik Larsen (parent_id\u202f2)  \n- Laura Davis (parent_id\u202f12)",
+      "error": "None"
+    },
+    {
+      "question": "Which players are not in any ensemble?",
+      "sql": "SELECT p.player_id, p.first_name, p.last_name\nFROM player p\nLEFT JOIN membership m ON p.player_id = m.player_id\nWHERE m.ensemble_id IS NULL;",
+      "queryRawResponse": "[(16, 'Jack', 'Olsen')]",
+      "friendlyResponse": "Player\u202fID\u202f16 \u2013 Jack\u202fOlsen.",
+      "error": "None"
+    },
+    {
+      "question": "Who is the youngest player in the Wind Ensemble?",
+      "sql": "SELECT p.player_id, p.first_name, p.last_name, p.birth_date\nFROM player p\nJOIN membership m ON p.player_id = m.player_id\nJOIN ensemble e ON m.ensemble_id = e.ensemble_id\nWHERE e.name = 'Wind Ensemble'\nORDER BY p.birth_date DESC\nLIMIT 1;",
+      "queryRawResponse": "[(14, 'Henry', 'Wilson', '2012-09-15')]",
+      "friendlyResponse": "The youngest player in the Wind Ensemble is **Henry\u202fWilson**, born\u202f**2012\u201109\u201115**.",
+      "error": "None"
+    },
+    {
+      "question": "Which conductor works with the most players?",
+      "sql": "SELECT c.name,\n       COUNT(DISTINCT m.player_id) AS player_count\nFROM conductor c\nJOIN ensemble e      ON c.conductor_id = e.conductor_id\nJOIN membership m    ON e.ensemble_id = m.ensemble_id\nGROUP BY c.conductor_id\nORDER BY player_count DESC\nLIMIT 1;",
+      "queryRawResponse": "[('Maria Alvarez', 11)]",
+      "friendlyResponse": "Maria Alvarez works with the most players, totaling 11.",
+      "error": "None"
+    },
+    {
+      "question": "Which ensembles have rehearsals that overlap in time?",
+      "sql": "SELECT DISTINCT e1.ensemble_id, e1.name\nFROM ensemble e1\nJOIN ensemble e2\n  ON e1.rehearsal_day = e2.rehearsal_day\n AND e1.ensemble_id <> e2.ensemble_id\n AND e1.start_time < e2.end_time\n AND e2.start_time < e1.end_time;",
+      "queryRawResponse": "[(1, 'Symphony Orchestra'), (2, 'Wind Ensemble'), (3, 'String Quartet'), (5, 'Chamber Strings')]",
+      "friendlyResponse": "The ensembles with overlapping rehearsals are:\n\n- Symphony Orchestra  \n- Wind Ensemble  \n- String Quartet  \n- Chamber Strings",
+      "error": "None"
+    },
+    {
+      "question": "Which other ensembles could Emma Larsen join without a schedule conflict?",
+      "sql": "SELECT e.ensemble_id,\n       e.name,\n       e.conductor_id,\n       e.rehearsal_day,\n       e.start_time,\n       e.end_time,\n       e.room\nFROM ensemble e\nWHERE NOT EXISTS (\n    SELECT 1\n    FROM membership m\n    JOIN player p ON p.player_id = m.player_id\n    JOIN ensemble cur ON cur.ensemble_id = m.ensemble_id\n    WHERE p.first_name = 'Emma' AND p.last_name = 'Larsen'\n      AND e.rehearsal_day = cur.rehearsal_day\n      AND NOT (e.end_time <= cur.start_time OR cur.end_time <= e.start_time)\n)\n  AND e.ensemble_id NOT IN (\n    SELECT m.ensemble_id\n    FROM membership m\n    JOIN player p ON p.player_id = m.player_id\n    WHERE p.first_name = 'Emma' AND p.last_name = 'Larsen'\n);",
+      "queryRawResponse": "[]",
+      "friendlyResponse": "Nothing matched.",
+      "error": "None"
+    },
+    {
+      "question": "We need to email the parents of everyone in the Jazz Band. Is there anyone we can't reach?",
+      "sql": "SELECT DISTINCT p.parent_id, p.name, p.email\nFROM parent AS p\nJOIN player_parent AS pp ON p.parent_id = pp.parent_id\nJOIN player AS pl ON pp.player_id = pl.player_id\nJOIN membership AS m ON pl.player_id = m.player_id\nJOIN ensemble AS e ON m.ensemble_id = e.ensemble_id\nWHERE e.name = 'Jazz Band'\n  AND (p.email IS NULL OR p.email = '');",
+      "queryRawResponse": "[(7, 'Carlos Martinez', None)]",
+      "friendlyResponse": "Yes\u2014parent\u202f7, **Carlos\u202fMartinez**, has no email address on file.",
+      "error": "None"
+    },
+    {
+      "question": "Do any orchestras have the same conductor? Which ones?",
+      "sql": "SELECT \n    c.conductor_id,\n    c.name AS conductor_name,\n    GROUP_CONCAT(e.name, ', ') AS ensembles\nFROM ensemble e\nJOIN conductor c ON e.conductor_id = c.conductor_id\nGROUP BY c.conductor_id\nHAVING COUNT(e.ensemble_id) > 1;",
+      "queryRawResponse": "[(1, 'Maria Alvarez', 'Symphony Orchestra, Chamber Strings'), (2, 'David Chen', 'Wind Ensemble, Jazz Band')]",
+      "friendlyResponse": "Yes!  \n\n- **Maria Alvarez** \u2013 conducts *Symphony Orchestra* and *Chamber Strings*  \n- **David\u202fChen** \u2013 conducts *Wind Ensemble* and *Jazz Band*",
+      "error": "None"
+    }
+  ]
+}

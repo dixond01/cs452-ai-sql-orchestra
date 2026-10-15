@@ -1,6 +1,11 @@
-"""Runs every question under every prompting strategy and saves a JSON log per strategy."""
+"""Runs every question under every prompting strategy and saves a JSON log per strategy.
+
+    python run_experiments.py                  all three strategies
+    python run_experiments.py single_domain    just the strategies named
+"""
 import json
 import os
+import sys
 from time import time
 
 import ai
@@ -22,34 +27,46 @@ QUESTIONS = [
 
 
 def main():
+    strategies = sys.argv[1:] or list(ai.STRATEGIES)
+    for strategy in strategies:
+        if strategy not in ai.STRATEGIES:
+            raise SystemExit(f"Unknown strategy {strategy}. Choose from: " + ", ".join(ai.STRATEGIES))
+
     db.build_db()
     os.makedirs(db.get_path("responses"), exist_ok=True)
     print(f"Model: {ai.get_model()}")
+    print(f"This run needs up to {len(strategies) * len(QUESTIONS) * 2} requests.")
 
-    for strategy in ai.STRATEGIES:
+    for strategy in strategies:
         print("########################################################################")
         print(f"Running strategy: {strategy}")
         responses = {
             "strategy": strategy,
             "model": ai.get_model(),
             "prompt_prefix": ai.STRATEGIES[strategy](),
+            "questionResults": [],
         }
-        question_results = []
+        out_path = db.get_path(os.path.join("responses", f"response_{strategy}_{time()}.json"))
+
         for question in QUESTIONS:
             print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
             print("Question:\n" + question)
-            result = ai.answer_question(question, strategy)
+            try:
+                result = ai.answer_question(question, strategy)
+            except ai.QuotaExhausted as err:
+                print(f"\n{err} Stopping. Results so far are saved in {out_path}")
+                return
             print("SQL:\n" + result["sql"])
             print("Raw result:\n" + result["queryRawResponse"])
             print("Friendly response:\n" + result["friendlyResponse"])
             if result["error"] != "None":
                 print("Error:\n" + result["error"])
-            question_results.append(result)
 
-        responses["questionResults"] = question_results
-        out_path = db.get_path(os.path.join("responses", f"response_{strategy}_{time()}.json"))
-        with open(out_path, "w") as out_file:
-            json.dump(responses, out_file, indent=2)
+            # save after every question so nothing is lost if the run stops
+            responses["questionResults"].append(result)
+            with open(out_path, "w") as out_file:
+                json.dump(responses, out_file, indent=2)
+
         print(f"Saved {out_path}")
 
     print("Done!")
