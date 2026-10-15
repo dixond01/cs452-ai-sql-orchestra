@@ -2,7 +2,7 @@
 
 All from the `openai/gpt-oss-120b` runs in [`responses/`](responses/). I checked each result against the data by hand.
 
-## 1. How many players are in each ensemble? ✅
+## 1. How many players are in each ensemble?
 
 **Strategy**: zero-shot
 
@@ -19,7 +19,7 @@ GROUP BY e.ensemble_id, e.name;
 
 **Friendly response**: Here's how many players are in each ensemble: Symphony Orchestra: 10 players, Wind Ensemble: 5 players, String Quartet: 4 players, Jazz Band: 7 players, Chamber Strings: 6 players.
 
-## 2. Who is the first chair cellist in the Symphony Orchestra? ✅
+## 2. Who is the first chair cellist in the Symphony Orchestra?
 
 **Strategy**: single-domain
 
@@ -38,7 +38,7 @@ WHERE e.name = 'Symphony Orchestra'
 
 **Friendly response**: The first chair cellist in the Symphony Orchestra is Ethan Nguyen.
 
-## 3. Which players play more than one instrument? ✅
+## 3. Which players play more than one instrument?
 
 **Strategy**: cross-domain
 
@@ -57,7 +57,7 @@ HAVING COUNT(DISTINCT s.instrument) > 1;
 
 **Friendly response**: Here are the players who play more than one instrument: Emma Larsen (ID 1), Sophia Martinez (ID 7), Mason Clark (ID 8), Charlotte Davis (ID 13), Amelia Garcia (ID 15).
 
-## 4. Which parents have more than one child in the program? ✅
+## 4. Which parents have more than one child in the program?
 
 **Strategy**: single-domain
 
@@ -75,7 +75,7 @@ HAVING COUNT(DISTINCT pp.player_id) > 1;
 
 **Friendly response**: Here are the parents who have more than one child in the program: Karen Larsen – 801‑555‑0101 – karen.larsen@example.com (2 children), Erik Larsen – 801‑555‑0102 – erik.larsen@example.com (2 children), Laura Davis – 801‑555‑0112 – laura.davis@example.com (2 children).
 
-## 5. Who is the youngest player in the Wind Ensemble? ✅
+## 5. Who is the youngest player in the Wind Ensemble?
 
 **Strategy**: zero-shot
 
@@ -95,7 +95,7 @@ LIMIT 1;
 
 **Friendly response**: The youngest player in the Wind Ensemble is Henry Wilson, born 2012‑09‑15.
 
-## 6. Which ensembles have rehearsals that overlap in time? ✅
+## 6. Which ensembles have rehearsals that overlap in time?
 
 **Strategy**: single-domain
 
@@ -117,7 +117,7 @@ JOIN ensemble e2
 
 **Friendly response**: Saturday: Symphony Orchestra and Wind Ensemble. Tuesday: String Quartet and Chamber Strings.
 
-## 7. Which other ensembles could Emma Larsen join without a schedule conflict? ⚠️
+## 7. Which other ensembles could Emma Larsen join without a schedule conflict?
 
 **Strategy**: zero-shot
 
@@ -148,11 +148,11 @@ WHERE e.ensemble_id NOT IN (
 
 Interesting detail: zero-shot hard-coded `player_id = 1`, which it could only know from the sample rows in the prompt. The other two strategies looked her up by name.
 
-## 8. Do any orchestras have the same conductor? Which ones? ❌ / ✅
+## 8. Do any orchestras have the same conductor? Which ones?
 
-This was the question I came up with. The result depended on the strategy.
+The result depended on the strategy.
 
-**Single-domain** ❌ took "orchestras" literally:
+**Single-domain** took "orchestras" literally:
 
 ```sql
 SELECT
@@ -169,7 +169,7 @@ HAVING COUNT(*) > 1;
 
 **Friendly response**: Nothing matched.
 
-**Zero-shot** ✅ treated every ensemble as an orchestra:
+**Zero-shot** treated every ensemble as an orchestra:
 
 ```sql
 SELECT e.conductor_id,
